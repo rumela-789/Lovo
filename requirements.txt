@@ -1,2 +1,0 @@
-flask
-# যদি FastAPI হয়: fastapi uvicorn
