@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DecentralCloud - Fixed Phone Auth</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- reCAPTCHA Library (অত্যন্ত জরুরি) -->
+    <script src="https://www.google.com/recaptcha/api.js"></script>
+
+    <style>
+        :root {
+            --neon-green: #00ff9d;
+            --dark-bg: #050505;
+            --panel: #111;
+            --border: #333;
+            --input-bg: #1a1a1a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Rajdhani', sans-serif; }
+
+        body {
+            background-color: var(--dark-bg);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(0, 255, 157, 0.05);
+            text-align: center;
+            display: none; 
+        }
+
+        .active-screen { display: block; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        h2 { color: var(--neon-green); margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px; }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: white;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            text-align: center;
+        }
+        input:focus { border-color: var(--neon-green); }
+        
+        .phone-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        select {
+            flex: 0 0 100px;
+            padding: 15px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: white;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--neon-green);
+            color: #000;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 8px;
+            text-transform: uppercase;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { background: #555; cursor: not-allowed; }
+
+        .file-list { margin-top: 20px; max-height: 300px; overflow-y: auto; text-align: left; }
+        .file-item {
+            background: #1a1a1a; padding: 12px; margin-bottom: 8px;
+            border-radius: 6px; border-left: 3px solid var(--neon-green);
+            display: flex; justify-content: space-between;
+        }
+        .upload-area {
+            border: 1px dashed var(--border); padding: 20px; margin-top: 20px; cursor: pointer;
+        }
+        .upload-area:hover { border-color: var(--neon-green); }
+
+        .msg { font-size: 13px; margin-top: 15px; min-height: 20px; }
+        .error { color: #ff4444; }
+        .success { color: var(--neon-green); }
+
+        /* Recaptcha কন্টেইনার ভিজিবল করা (Display: block করা হয়েছে) */
+        #recaptcha-container {
+            display: block;
+            margin: 20px 0;
+            min-height: 78px; /* জায়গা রাখা */
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Screen 1: Phone Number -->
+    <div class="container active-screen" id="screenPhone">
+        <h2>Register / Login</h2>
+        <p style="color:#888; margin-bottom:20px;">Enter phone to get verification code</p>
+        
+        <div class="phone-container">
+            <select id="countryCode">
+                <option value="+880">+880 (BD)</option>
+                <option value="+91">+91 (IN)</option>
+                <option value="+1">+1 (USA)</option>
+            </select>
+            <input type="tel" id="phoneNumber" placeholder="1712345678">
+        </div>
+        
+        <div id="recaptcha-container"></div> <!-- এখানে চেকবক্স আসবে -->
+
+        <button class="btn" id="sendCodeBtn" onclick="sendOTP()">Get Code</button>
+        <div id="msgPhone" class="msg"></div>
+    </div>
+
+    <!-- Screen 2: OTP Input -->
+    <div class="container" id="screenOTP">
+        <h2>Verify Number</h2>
+        <p style="color:#888; margin-bottom:20px;">Enter the code sent to your phone</p>
+        
+        <input type="number" id="otpInput" placeholder="123456" maxlength="6">
+        
+        <button class="btn" onclick="verifyOTP()">Verify & Login</button>
+        <div id="msgOTP" class="msg"></div>
+    </div>
+
+    <!-- Screen 3: Dashboard -->
+    <div class="container" id="screenDash">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid #333; padding-bottom:10px;">
+            <h3 style="color:white;">My Vault</h3>
+            <button onclick="logout()" style="background:none; border:none; color:#ff4444; cursor:pointer;">Logout</button>
+        </div>
+
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <i class="fas fa-cloud-upload-alt" style="font-size:30px; color:var(--neon-green); margin-bottom:10px;"></i>
+            <div>Upload File</div>
+        </div>
+        <input type="file" id="fileInput" style="display:none" onchange="handleUpload(this)">
+
+        <div class="file-list" id="fileList"></div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+        import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+        // Config
+        const firebaseConfig = {
+          apiKey: "AIzaSyAKqNt9KLTVy3OXiLVmJGyADzdnQQ_cASE",
+          authDomain: "livoapp-dc2da.firebaseapp.com",
+          projectId: "livoapp-dc2da",
+          storageBucket: "livoapp-dc2da.firebasestorage.app",
+          messagingSenderId: "178266701059",
+          appId: "1:178266701059:web:23775265b7dc81b765fd36"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.recaptchaVerifier = null;
+        window.confirmationResult = null;
+
+        // DOM
+        const screens = {
+            phone: document.getElementById('screenPhone'),
+            otp: document.getElementById('screenOTP'),
+            dash: document.getElementById('screenDash')
+        };
+        const msgs = {
+            phone: document.getElementById('msgPhone'),
+            otp: document.getElementById('msgOTP')
+        };
+
+        // ১. OTP Send Function
+        window.sendOTP = async () => {
+            const countryCode = document.getElementById('countryCode').value;
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            const fullPhone = countryCode + phoneNumber;
+
+            if (!phoneNumber || phoneNumber.length < 10) {
+                showMsg('phone', 'Invalid phone number', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('sendCodeBtn');
+            btn.disabled = true;
+            btn.textContent = "Sending...";
+
+            try {
+                // Recaptcha ইনিশিয়ালাইজ করা (নরমাল মোড)
+                // যদি আগে থাকে তবে রিসেট করা ভালো
+                if (window.recaptchaVerifier) {
+                    window.recaptchaVerifier.clear();
+                }
+
+                window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                    'size': 'normal', // ভিজিবল চেকবক্স (সমাধান)
+                    'callback': (response) => {
+                        // চেকবক্স সফল হলে কোড আরো এগিয়ে যাবে
+                    }
+                });
+
+                // SMS পাঠানো
+                const confirmationResult = await signInWithPhoneNumber(auth, fullPhone, window.recaptchaVerifier);
+                window.confirmationResult = confirmationResult;
+
+                showMsg('phone', 'Code sent!', 'success');
+                switchScreen('otp');
+
+            } catch (error) {
+                console.error(error);
+                showMsg('phone', 'Error: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Get Code";
+            }
+        };
+
+        // ২. OTP Verify Function
+        window.verifyOTP = async () => {
+            const code = document.getElementById('otpInput').value;
+            
+            if (code.length !== 6) {
+                showMsg('otp', 'Please enter 6 digit code', 'error');
+                return;
+            }
+
+            try {
+                await window.confirmationResult.confirm(code);
+                showMsg('otp', 'Login Successful!', 'success');
+            } catch (error) {
+                console.error(error);
+                showMsg('otp', 'Invalid Code', 'error');
+            }
+        };
+
+        // ৩. Auth State Check
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                switchScreen('dash');
+                loadFiles(user.uid);
+            } else {
+                switchScreen('phone');
+                document.getElementById('phoneNumber').value = '';
+                document.getElementById('otpInput').value = '';
+            }
+        });
+
+        function switchScreen(screenName) {
+            Object.values(screens).forEach(el => el.classList.remove('active-screen'));
+            screens[screenName].classList.add('active-screen');
+        }
+
+        function showMsg(location, text, type) {
+            msgs[location].textContent = text;
+            msgs[location].className = 'msg ' + type;
+        }
+
+        window.logout = () => signOut(auth);
+
+        // File Logic
+        window.handleUpload = async (input) => {
+            const file = input.files[0];
+            if (!file) return;
+            const data = { name: file.name, size: (file.size / 1024).toFixed(1) + ' KB', uid: auth.currentUser.uid };
+            try {
+                await addDoc(collection(db, "files"), data);
+                alert("Saved!");
+                loadFiles(auth.currentUser.uid);
+            } catch (e) { alert("Failed"); }
+        };
+
+        async function loadFiles(uid) {
+            const list = document.getElementById('fileList');
+            list.innerHTML = '';
+            const q = query(collection(db, "files"), where("uid", "==", uid));
+            const snapshot = await getDocs(q);
+            snapshot.forEach(doc => {
+                const d = doc.data();
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.innerHTML = `<span>${d.name}</span><span style="font-size:12px; color:#666;">${d.size}</span>`;
+                list.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
